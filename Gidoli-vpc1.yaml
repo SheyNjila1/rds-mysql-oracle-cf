@@ -1,0 +1,332 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: This template creates VPC with Public and Private Subnets
+  
+# The following metadata isn used to group parameters
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - 
+        Label:
+          default: "VPC CIDR"
+        Parameters:
+          - VpcCIDR
+      -
+        Label:
+          default: "Subnet CIDR"
+        Parameters:
+          - PublicSubnet1CIDR
+          - PublicSubnet2CIDR
+          - PrivateSubnet1CIDR 
+          - PrivateSubnet2CIDR
+          - PrivateSubnet3CIDR
+          - PrivateSubnet4CIDR
+      - 
+        Label:
+          default: "SSH CIDR"
+        Parameters:
+          - SSHLocation
+
+# Parameters are used to build flexible CloudFormation templates
+Parameters:
+  VpcCIDR:
+    Default: 10.0.0.0/16
+    Description: Please enetr the IP range (CIDR notation) for this VPC
+    Type: String  
+
+  PublicSubnet1CIDR:
+    Default: 10.0.0.0/24
+    Description: Please enter the IP range (CIDR notation) for Public subnet1
+    Type: String
+
+  PublicSubnet2CIDR:
+    Default: 10.0.1.0/24
+    Description: Please enter the IP range (CIDR notation) for Public subnet2
+    Type: String
+
+  PrivateSubnet1CIDR:
+    Default: 10.0.2.0/24
+    Description: Please enter the IP range (CIDR notation) for Private subnet1
+    Type: String
+
+  PrivateSubnet2CIDR:
+    Default: 10.0.3.0/24
+    Description: Please enter the IP range (CIDR notation) for Private subnet2
+    Type: String
+
+  PrivateSubnet3CIDR:
+    Default: 10.0.4.0/24
+    Description: Please enter the IP range (CIDR notation) for Private subnet3
+    Type: String
+
+  PrivateSubnet4CIDR:
+    Default: 10.0.5.0/24
+    Description: Please enter the IP range (CIDR notation) for Private subnet4
+    Type: String
+
+  SSHLocation:
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+    Default: 0.0.0.0/0
+    Description: The IP address range that can be used to access the web server using SSH.
+    MaxLength: '18'
+    MinLength: '9'
+    Type: String
+ 
+Resources:
+  # Create VPC
+# Create VPC
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: Test VPC
+
+# Create Internet Gateway
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: Test IGW
+ 
+
+  # Attach Internet Gateway to VPC
+  InternetGatewayAttachement:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+  
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      # AssignIpv6AddressOnCreation: Boolean
+      AvailabilityZone: !Select [0, !GetAZs '']
+      # AvailabilityZoneId: String
+      CidrBlock: !Ref PublicSubnet1CIDR 
+      # EnableDns64: Boolean
+      # Ipv6CidrBlock: String
+      # Ipv6Native: Boolean
+      MapPublicIpOnLaunch: True
+      # OutpostArn: String
+      # PrivateDnsNameOptionsOnLaunch: 
+      Tags: 
+        - Key: Name
+          Kalue: Public subnet 1 | Web Tier
+      VpcId: !Ref VPC 
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      # AssignIpv6AddressOnCreation: Boolean
+      AvailabilityZone: !Select [1, !GetAZs '']
+      # AvailabilityZoneId: String
+      CidrBlock: !Ref PublicSubnet2CIDR 
+      # EnableDns64: Boolean
+      # Ipv6CidrBlock: String
+      # Ipv6Native: Boolean
+      MapPublicIpOnLaunch: true
+      # OutpostArn: String
+      # PrivateDnsNameOptionsOnLaunch: 
+      Tags: 
+        - Key: Name
+          Value: Public subnet 2 | Web Tier
+      VpcId: !Ref VPC 
+
+  # Create Public Route Table
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC 
+      Tags:
+        - Key: Name
+          Value: Public Route Table
+  
+  # Add a Public Route to the Route Table
+  PublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref PublicRouteTable
+      GatewayId: !Ref InternetGateway 
+
+  # Associate Public Subnet 1 with Public Route Table
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref  PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  # Associate Public Subnet 2 with Public Route Table
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref  PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable  
+
+  # Create Private Subnet1 
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      # AssignIpv6AddressOnCreation: Boolean
+      AvailabilityZone: !Select [2, !GetAZs '']
+      # AvailabilityZoneId: String
+      CidrBlock: !Ref PrivateSubnet1CIDR 
+      # EnableDns64: Boolean
+      # Ipv6CidrBlock: String
+      # Ipv6Native: Boolean
+      MapPublicIpOnLaunch: false
+      # OutpostArn: String
+      # PrivateDnsNameOptionsOnLaunch: 
+      Tags: 
+        - Key: Name
+          Kalue: Private subnet 1 | App Tier
+      VpcId: !Ref VPC
+
+  # Create Private Subnet2 
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      # AssignIpv6AddressOnCreation: Boolean
+      AvailabilityZone: !Select [3, !GetAZs '']
+      # AvailabilityZoneId: String
+      CidrBlock: !Ref PrivateSubnet2CIDR 
+      # EnableDns64: Boolean
+      # Ipv6CidrBlock: String
+      # Ipv6Native: Boolean
+      MapPublicIpOnLaunch: false
+      # OutpostArn: String
+      # PrivateDnsNameOptionsOnLaunch: 
+      Tags: 
+        - Key: Name
+          Kalue: Private subnet 2 | App Tier
+      VpcId: !Ref VPC 
+
+  # Create Private Subnet3
+  PrivateSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      # AssignIpv6AddressOnCreation: Boolean
+      AvailabilityZone: !Select [4, !GetAZs '']
+      # AvailabilityZoneId: String
+      CidrBlock: !Ref PrivateSubnet3CIDR 
+      # EnableDns64: Boolean
+      # Ipv6CidrBlock: String
+      # Ipv6Native: Boolean
+      MapPublicIpOnLaunch: false
+      # OutpostArn: String
+      # PrivateDnsNameOptionsOnLaunch: 
+      Tags: 
+        - Key: Name
+          Value: Private subnet 3 | Database Tier
+      VpcId: !Ref VPC 
+
+  # Create Private Subnet4
+  PrivateSubnet4:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      # AssignIpv6AddressOnCreation: Boolean
+      AvailabilityZone: !Select [5, !GetAZs '']
+      # AvailabilityZoneId: String
+      CidrBlock: !Ref PrivateSubnet4CIDR 
+      # EnableDns64: Boolean
+      # Ipv6CidrBlock: String
+      # Ipv6Native: Boolean
+      MapPublicIpOnLaunch: false
+      # OutpostArn: String
+      # PrivateDnsNameOptionsOnLaunch: 
+      Tags: 
+        - Key: Name
+          Value: Private subnet 4 | Database Tier
+      VpcId: !Ref VPC 
+
+  # Create Application Load Balancer Security Group
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    # DependsOn: VPC
+    Properties:
+      GroupDescription: Enable HTTP/HTTPS Access on port 80/443
+      #VpcId: Ref: VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 10.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 10.0.0.0/24
+      Tags:
+        - Key: Name
+          Value: ALB Security Group
+      VpcId: !Ref VPC 
+  
+  # Create SSH Security Group
+  SSHSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    # DependsOn: VPC
+    Properties:
+      GroupDescription: Enable SSH Connection on SSH Security Group 
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref SSHLocation
+      Tags:
+        - Key: Name
+          Value: SSH Security Group
+      VpcId: !Ref VPC
+  
+  # Create  Security Group for the Web Server
+  WebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    # DependsOn: VPC
+    Properties:
+      GroupDescription: Enable HTTP/HTTPS access via port 80/443 down to the Application Laod Balancer
+      #VpcId: Ref: VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80   
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourceSecurityGroupId: !Ref SSHSecurityGroup
+      Tags:
+        - Key: Name
+          Value: Web Server Security Group
+      VpcId: !Ref VPC 
+    
+  # Create a Database Security
+
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    # DependsOn: VPC
+    Properties:
+      GroupDescription: Enable HTTP/HTTPS Access on port 80/443
+      #VpcId: Ref: VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref WebServerSecurityGroup
+      Tags:
+        - Key: Name
+          Value: Database Security Group
+      VpcId: !Ref VPC 
+#Outputs:
+ 
