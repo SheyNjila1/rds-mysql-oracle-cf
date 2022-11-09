@@ -1,0 +1,303 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "AWS CloudFormation Sample Template for creating an Amazon RDS DB instance: Sample template showing how to create a DB instance with Enhanced Monitoring enabled. **WARNING** This template creates an RDS DB instance. You will be billed for the AWS resources used if you create a stack from this template.",
+
+    "Parameters": {
+
+      # VPC Parameters
+      "RdsVpcCIDR": {
+          "Description": "Enter the VPC Cidr",
+          "Type": "String",
+          "Default": "10.100.0.0/16"
+      },
+      "RdsWebCIDR": {
+          "Description": "Enter the Public Subnet Cidr to host the bastion host in AZ1",
+          "Type": "String",
+          "Default": "10.100.10.0/24"
+      },
+      "RdsPrivateSubnetAz1CIDR": {
+          "Description": "Enter CidrBlock for private subnet to host mysq/oracle DB in AZ1",
+          "Type": "String",
+          "Default": "10.100.20.0/24"
+      },
+      "RdsPrivateSubnetAz2CIDR": {
+          "Description": "Enter CidrBlock for private subnet to host mysq/oracle DB in AZ2",
+          "Type": "String",
+          "Default": "10.100.30.0/24"
+      },
+
+      # Parameters for Bastion servers (Jumb Box)
+      "BastionAMIID": {
+         "Description": "Enter the AMI ID for the Instance",
+         "Type": "String",
+         "Default": "ami-0fa49cc9dc8d62c84"
+     },
+
+     "BastionInstanceType" : {
+         "Type" : "String",
+         "Default" : "t2.micro",
+         "AllowedValues" : ["t2.micro", "m1.small", "m1.large"],
+         "Description" : "Enter t2.micro, m1.small, or m1.large. Default is t2.micro."
+       },
+
+     "SSHLocation" : {
+       "Description" : "The IP address range that can be used to SSH to the EC2 instances",
+       "Type": "String",
+       "MinLength": "9",
+       "MaxLength": "18",
+       "Default": "0.0.0.0/0",
+       "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+       "ConstraintDescription": "Must be a valid IP CIDR range of the form x.x.x.x/x"
+     },
+
+
+
+      # Parameters for RDS Database
+        "DBInstanceID": {
+            "Default": "mydbinstance",
+            "Description": "My database instance",
+            "Type": "String",
+            "MinLength": "1",
+            "MaxLength": "63",
+            "AllowedPattern": "[a-zA-Z][a-zA-Z0-9]*",
+            "ConstraintDescription": "Must begin with a letter and must not end with a hyphen or contain two consecutive hyphens."
+        },
+        "DBName": {
+            "Default": "mydb",
+            "Description": "My database",
+            "Type": "String",
+            "MinLength": "1",
+            "MaxLength": "64",
+            "AllowedPattern": "[a-zA-Z][a-zA-Z0-9]*",
+            "ConstraintDescription": "Must begin with a letter and contain only alphanumeric characters."
+        },
+        "DBInstanceClass": {
+            "Default": "db.m5.large",
+            "Description": "DB instance class",
+            "Type": "String",
+            "ConstraintDescription": "Must select a valid DB instance type."
+        },
+        "DBAllocatedStorage": {
+            "Default": "50",
+            "Description": "The size of the database (GiB)",
+            "Type": "Number",
+            "MinValue": "20",
+            "MaxValue": "65536",
+            "ConstraintDescription": "must be between 20 and 65536 GiB."
+        },
+        "DBUsername": {
+            "NoEcho": "true",
+            "Description": "Username for MySQL database access",
+            "Type": "String",
+            "MinLength": "1",
+            "MaxLength": "16",
+            "AllowedPattern": "[a-zA-Z][a-zA-Z0-9]*",
+            "ConstraintDescription": "must begin with a letter and contain only alphanumeric characters."
+        },
+        "DBPassword": {
+            "NoEcho": "true",
+            "Description": "Password MySQL database access",
+            "Type": "String",
+            "MinLength": "8",
+            "MaxLength": "41",
+            "AllowedPattern": "[a-zA-Z0-9]*",
+            "ConstraintDescription": "must contain only alphanumeric characters."
+        },
+    },
+
+}
+
+  "Rules" : {
+    set of rules
+  },
+
+  "Mappings" : {
+    set of mappings
+  },
+
+  "Conditions" : {
+    set of conditions
+  },
+
+  "Transform" : {
+    set of transforms
+  },
+
+  "Resources" : {
+     # Create vpc with name RdsVpc
+    "RdsVpc" : {
+   "Type" : "AWS::EC2::VPC",
+   "Properties" : {
+      "CidrBlock" : "{ "Ref": "RdsVpcCIDR" }",
+      "EnableDnsSupport" : "true",
+      "EnableDnsHostnames" : "true",
+      "Tags" : [
+         {"Key" : "Name", "Value" : "development"}
+      ]
+   }
+},
+ # Create a Public Subnet with name RdsPublicSubnet for Bastion Host
+"RdsPublicSubnet" : {
+   "Type" : "AWS::EC2::Subnet",
+   "Properties" : {
+      "VpcId" : { "Ref" : "RdsVpc" },
+      "CidrBlock" : "10.0.0.0/24",
+      "AvailabilityZone" : "us-east-1a",
+      "Tags" : [ { "Key" : "stack", "Value" : "RdsPublicSubnet" } ]
+   }
+ },
+ "RdSInternetGateway": {
+   "Type": "AWS::EC2::InternetGateway",
+   "Properties": {
+     "Tags": [{ "Key": "Name", "Value":  "RDS Internet Gateway" }]
+   }
+ },
+ "RdsAttachGateway": {
+   "Type": "AWS::EC2::VPCGatewayAttachment",
+   "Properties": {
+     "VpcId": { "Ref": "RdsVpc" },
+     "InternetGatewayId": { "Ref": "RdSInternetGateway" }
+   }
+ },
+
+"RdsPublicSubnet": {
+  "Type": "AWS::EC2::Subnet",
+  "Properties": {
+    "AvailabilityZone": "us-east-1a",
+    "MapPublicIpOnLaunch": true,
+    "VpcId": { "Ref": "RdsVpc" },
+    "CidrBlock": { "Ref": "RdsWebCIDR" },
+    "Tags": [{ "Key": "Name", "Value":  "RdsPublicSubnet |us-east-1a" }]
+  }
+},
+
+"RdsPrivateSubnet-AZ1" : {
+   "Type" : "AWS::EC2::Subnet",
+   "Properties" : {
+      "VpcId" : { "Ref" : "RdsVpc" },
+      "CidrBlock" : { "Ref": "RdsPrivateSubnetAz1CIDR" }
+      "AvailabilityZone" : "us-east-1a",
+      "Tags" : [ { "Key" : "stack", "Value" : "RdsPriavteSubnet |us-east-1a" } ]
+   }
+},
+
+"RdsPrivateSubnet-AZ2" : {
+   "Type" : "AWS::EC2::Subnet",
+   "Properties" : {
+      "VpcId" : { "Ref" : "RdsVpc" },
+      "CidrBlock" : { "Ref": "RdsPrivateSubnetAz2CIDR" }
+      "AvailabilityZone" : "us-east-1b",
+      "Tags" : [ { "Key" : "stack", "Value" : "RdsPriavteSubnet |us-east-1b" } ]
+   }
+},
+
+
+        "MysqlDBSubnetGroup": {
+            "Type": "AWS::RDS::DBSubnetGroup",
+            "Properties": {
+                "DBSubnetGroupDescription": "Subnets for MysqlDB/OracleDB",
+                "SubnetIds": [
+                  {
+                    "ref": "RdsPrivateSubnet-AZ1"
+                  },
+                   {
+                    "ref": "RdsPrivateSubnet-AZ2"
+                  },
+
+                ],
+
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "MysqlDBSubnetGroup"
+                    }
+                ]
+            }
+        },
+
+      "MysqlDBinstance" : {
+         "Type" : "AWS::RDS::DBInstance",
+         "Properties" : {
+            "AllocatedStorage" : "20",
+            "DBInstanceClass" : { "Ref": "DBInstanceClass" },
+           "DBName" : {"Ref": "DBName" },
+           "AllowMajorVersionUpgrade" : "false",
+           "AutoMinorVersionUpgrade" : "false",
+           "BackupRetentionPeriod" "7",
+           "DBInstanceIdentifier" : ["{ "Ref": "RdsMsqlMyDB" }"],  #Complete with ref
+            "VPCSecurityGroups" : [ { "Ref" : "RdsSecurityGroup" } ],
+            "DBSubnetGroupName" : { "Ref" : "MysqlDBSubnetGroup" },
+        },
+      },
+
+      "DBSubnetGroupName":
+        { "Ref": "MysqlDBSubnetGroup" }
+    },
+
+    # Create RDB
+            "RdsMsqlMyDB": {
+                "Type": "AWS::RDS::DBInstance",
+                "Properties": {
+                    "DBInstanceIdentifier": {
+                        "Ref": "DBInstanceID"
+                    },
+                    "DBName": {
+                        "Ref": "DBName"
+                    },
+                    "DBInstanceClass": {
+                        "Ref": "DBInstanceClass"
+                    },
+                    "AllocatedStorage": {
+                        "Ref": "DBAllocatedStorage"
+                    },
+                    "Engine": "MySQL",
+                    "EngineVersion": "8.0.16",
+
+                    "MasterUsername": {
+                        "Ref": "DBUsername"
+                    },
+
+                    "MasterUserPassword": {
+                        "Ref": "DBPassword"
+                    },
+                    "Port": "3306",
+                    "PublicAccessible": "false",
+                      "StorageType": "gp2"
+                    "MultiAZ": "false",
+                    "MonitoringInterval": 60,
+                    "MonitoringRoleArn": "arn:aws:iam::1233456789012:role/rds-monitoring-role",
+                    "Tags": [
+                      {
+                        "Key": "Name",
+                        "Value":  "MysqlDB"
+                        }
+                      ]
+                }
+            },
+
+            "RdsSecurityGroup" : {
+              "Type" : "AWS::EC2::SecurityGroup",
+              "Properties" : {
+                "GroupDescription" : "Allow http to client host",
+                "VpcId" : {"Ref" : "myVPC"},
+                "SecurityGroupIngress" : [{
+                    "IpProtocol" : "tcp",
+                    "FromPort" : 3306,
+                    "ToPort" : 3306,
+                    "CidrIp" : "0.0.0.0/0"
+                  }],
+
+                  "VpcId" : { "Ref": "RdsVpc" },
+                  "Tags" :  [ {"key": "Name", "Value": "RdsSecurityGroup"} ]
+      }
+    },
+
+
+
+
+  },
+
+  "Outputs" : {
+    set of outputs
+  }
+}
