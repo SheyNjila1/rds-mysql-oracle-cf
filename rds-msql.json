@@ -4,11 +4,10 @@
 
     "Parameters": {
 
-      # VPC Parameters
       "RdsVpcCIDR": {
           "Description": "Enter the VPC Cidr",
           "Type": "String",
-          "Default": "10.100.0.0/16"
+          "Default": "10.0.0.0/16"
       },
       "RdsWebCIDR": {
           "Description": "Enter the Public Subnet Cidr to host the bastion host in AZ1",
@@ -26,7 +25,7 @@
           "Default": "10.100.30.0/24"
       },
 
-      # Parameters for Bastion servers (Jumb Box)
+
       "BastionAMIID": {
          "Description": "Enter the AMI ID for the Instance",
          "Type": "String",
@@ -52,7 +51,7 @@
 
 
 
-      # Parameters for RDS Database
+
         "DBInstanceID": {
             "Default": "mydbinstance",
             "Description": "My database instance",
@@ -102,33 +101,16 @@
             "MaxLength": "41",
             "AllowedPattern": "[a-zA-Z0-9]*",
             "ConstraintDescription": "must contain only alphanumeric characters."
-        },
+        }
     },
 
-}
-
-  "Rules" : {
-    set of rules
-  },
-
-  "Mappings" : {
-    set of mappings
-  },
-
-  "Conditions" : {
-    set of conditions
-  },
-
-  "Transform" : {
-    set of transforms
-  },
 
   "Resources" : {
-     # Create vpc with name RdsVpc
+
     "RdsVpc" : {
    "Type" : "AWS::EC2::VPC",
    "Properties" : {
-      "CidrBlock" : "{ "Ref": "RdsVpcCIDR" }",
+      "CidrBlock" : { "Ref": "RdsVpcCIDR" },
       "EnableDnsSupport" : "true",
       "EnableDnsHostnames" : "true",
       "Tags" : [
@@ -136,8 +118,8 @@
       ]
    }
 },
- # Create a Public Subnet with name RdsPublicSubnet for Bastion Host
-"RdsPublicSubnet" : {
+
+"RdsPublicSubnetAZ1" : {
    "Type" : "AWS::EC2::Subnet",
    "Properties" : {
       "VpcId" : { "Ref" : "RdsVpc" },
@@ -160,7 +142,7 @@
    }
  },
 
-"RdsPublicSubnet": {
+"RdsPublicSubnetAZ2": {
   "Type": "AWS::EC2::Subnet",
   "Properties": {
     "AvailabilityZone": "us-east-1a",
@@ -171,21 +153,21 @@
   }
 },
 
-"RdsPrivateSubnet-AZ1" : {
+"RdsPrivateSubnetAZ1" : {
    "Type" : "AWS::EC2::Subnet",
    "Properties" : {
       "VpcId" : { "Ref" : "RdsVpc" },
-      "CidrBlock" : { "Ref": "RdsPrivateSubnetAz1CIDR" }
+      "CidrBlock" : { "Ref": "RdsPrivateSubnetAz1CIDR" },
       "AvailabilityZone" : "us-east-1a",
       "Tags" : [ { "Key" : "stack", "Value" : "RdsPriavteSubnet |us-east-1a" } ]
    }
 },
 
-"RdsPrivateSubnet-AZ2" : {
+"RdsPrivateSubnetAZ2" : {
    "Type" : "AWS::EC2::Subnet",
    "Properties" : {
       "VpcId" : { "Ref" : "RdsVpc" },
-      "CidrBlock" : { "Ref": "RdsPrivateSubnetAz2CIDR" }
+      "CidrBlock" : { "Ref": "RdsPrivateSubnetAz2CIDR" },
       "AvailabilityZone" : "us-east-1b",
       "Tags" : [ { "Key" : "stack", "Value" : "RdsPriavteSubnet |us-east-1b" } ]
    }
@@ -198,11 +180,11 @@
                 "DBSubnetGroupDescription": "Subnets for MysqlDB/OracleDB",
                 "SubnetIds": [
                   {
-                    "ref": "RdsPrivateSubnet-AZ1"
+                    "ref": "RdsPrivateSubnetAZ1"
                   },
                    {
-                    "ref": "RdsPrivateSubnet-AZ2"
-                  },
+                    "ref": "RdsPrivateSubnetAZ2"
+                  }
 
                 ],
 
@@ -218,23 +200,17 @@
       "MysqlDBinstance" : {
          "Type" : "AWS::RDS::DBInstance",
          "Properties" : {
-            "AllocatedStorage" : "20",
-            "DBInstanceClass" : { "Ref": "DBInstanceClass" },
+           "AllocatedStorage" : "20",
+           "DBInstanceClass" : { "Ref": "DBInstanceClass" },
            "DBName" : {"Ref": "DBName" },
-           "AllowMajorVersionUpgrade" : "false",
-           "AutoMinorVersionUpgrade" : "false",
-           "BackupRetentionPeriod" "7",
-           "DBInstanceIdentifier" : ["{ "Ref": "RdsMsqlMyDB" }"],  #Complete with ref
-            "VPCSecurityGroups" : [ { "Ref" : "RdsSecurityGroup" } ],
-            "DBSubnetGroupName" : { "Ref" : "MysqlDBSubnetGroup" },
-        },
+           "BackupRetentionPeriod": 7,
+           "DBInstanceIdentifier" : { "Ref": "DBInstanceID" },
+           "VPCSecurityGroups" : { "Ref" : "RdsSecurityGroup" },
+           "DBSubnetGroupName" : { "Ref" : "MysqlDBSubnetGroup" }
+        }
       },
 
-      "DBSubnetGroupName":
-        { "Ref": "MysqlDBSubnetGroup" }
-    },
 
-    # Create RDB
             "RdsMsqlMyDB": {
                 "Type": "AWS::RDS::DBInstance",
                 "Properties": {
@@ -262,7 +238,7 @@
                     },
                     "Port": "3306",
                     "PublicAccessible": "false",
-                      "StorageType": "gp2"
+                    "StorageType": "gp2",
                     "MultiAZ": "false",
                     "MonitoringInterval": 60,
                     "MonitoringRoleArn": "arn:aws:iam::1233456789012:role/rds-monitoring-role",
@@ -278,16 +254,14 @@
             "RdsSecurityGroup" : {
               "Type" : "AWS::EC2::SecurityGroup",
               "Properties" : {
-                "GroupDescription" : "Allow http to client host",
-                "VpcId" : {"Ref" : "myVPC"},
+                "GroupDescription" : "Allow http to the RDS",
+                "VpcId" : {"Ref" : "RdsVpc"},
                 "SecurityGroupIngress" : [{
                     "IpProtocol" : "tcp",
                     "FromPort" : 3306,
                     "ToPort" : 3306,
                     "CidrIp" : "0.0.0.0/0"
                   }],
-
-                  "VpcId" : { "Ref": "RdsVpc" },
                   "Tags" :  [ {"key": "Name", "Value": "RdsSecurityGroup"} ]
       }
     },
@@ -298,6 +272,6 @@
   },
 
   "Outputs" : {
-    set of outputs
+
   }
 }
